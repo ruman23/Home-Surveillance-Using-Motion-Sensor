@@ -11,7 +11,7 @@ from time import sleep  # Importing the time library to provide the delays in pr
 
 camera = picamera.PiCamera()
 camera.resolution = (640, 480)
-camera.framerate = 24
+camera.framerate = 10
 camera.vflip = True
 
 
@@ -24,6 +24,20 @@ now = datetime.datetime.now()
 
 bot = telepot.Bot('your_bot_id')
 globalChatId = your_chat_id
+
+
+def getImageDirector():
+    directory = '/home/pi/Documents/mypi/homeAutomation/resources/image/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    return directory
+
+def getVideoDirectory():
+    directory = '/home/pi/Documents/mypi/homeAutomation/resources/video/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    return directory
+    
 
 def connectToBoot():
     print('[LogId] Connecting to bot...')
@@ -41,10 +55,21 @@ commandList = '/hi /time /date /file /video /videoList /deleteVideos /image /ima
 def getFileName():  # new
     return datetime.datetime.now().strftime("%Y-%m-%d_%H.%M.%S.%f")
 
+# Delete all the files. But not delete the last `notDeletedFileCount` files
+def deleteFiles(bot, chat_id, directory, notDeletedFileCount):
+    #directory = getVideoDirectory()
+    files = os.listdir(directory)
+    totalFiles = len(files)
+    
+    for fileIndex in range(0, totalFiles - notDeletedFileCount):
+        os.remove(os.path.join(directory, files[fileIndex]))
+        
+    print('Total deleted videos: '+ str(totalFiles - notDeletedFileCount))
+    bot.sendMessage (chat_id, str(totalFiles - notDeletedFileCount) + str(' files has been deleted.'))
 
 def captureImage(bot, chat_id):
     #setup directory
-    path = '/home/pi/Documents/mypi/homeAutomation/resources/image/'
+    path = getImageDirector()
     fileName = getFileName()
     fileExtension = '.jpeg'
     imagePath = path + fileName + fileExtension
@@ -58,7 +83,7 @@ def captureImage(bot, chat_id):
     bot.sendPhoto(chat_id, photo=open(imagePath, 'rb'), caption = fileName)
     
 def deleteAllImages(bot, chat_id):
-    directory = '/home/pi/Documents/mypi/homeAutomation/resources/image/'
+    directory = getImageDirector()
     files = os.listdir(directory)
     totalFiles = len(files)
     print('Total deleted images: '+ str(totalFiles))
@@ -68,7 +93,7 @@ def deleteAllImages(bot, chat_id):
 
 def recordVideo(bot, chat_id, recordingTime):
     #setup directory
-    path = '/home/pi/Documents/mypi/homeAutomation/resources/video/'
+    path = getVideoDirectory()
     fileName = getFileName()
     h264Extension = '.h264'
     mp4Extension = '.mp4'
@@ -85,15 +110,16 @@ def recordVideo(bot, chat_id, recordingTime):
     #print(command)
     call([command], shell=True)
         
-    #delete h264 video file
-    os.remove(path+ fileName + h264Extension)
-        
     bot.sendMessage (chat_id, str("Video converted. Please wait for loading"))
         
     bot.sendVideo(chat_id, video = open(path+ fileName + mp4Extension, 'rb'))
+    
+      #delete h264 video file
+    os.remove(path+ fileName + h264Extension) 
+    deleteFiles(bot, chat_id, path, 5)
 
 def deletedAllVideos(bot, chat_id):
-    directory = '/home/pi/Documents/mypi/homeAutomation/resources/video/'
+    directory = getVideoDirectory()
     files = os.listdir(directory)
     totalFiles = len(files)
     print('Total deleted videos: '+ str(totalFiles))
@@ -118,16 +144,16 @@ def handle(msg):
     elif command == '/file':
         bot.sendDocument(chat_id, document=open('/home/pi/Documents/mypi/homeAutomation/telegram.py'))
     elif command == '/video':
-        recordVideo(bot, chat_id, 3)
+        recordVideo(bot, chat_id, 20)
     elif command == '/videoList':
-        directory = '/home/pi/Documents/mypi/homeAutomation/resources/video/'
+        directory = getVideoDirectory()
         bot.sendMessage (chat_id, str(os.listdir(directory)))
     elif command == '/deleteVideos':
         deletedAllVideos(bot, chat_id)
     elif command == '/image':
        captureImage(bot, chat_id)
     elif command == '/imageList':
-        directory = '/home/pi/Documents/mypi/homeAutomation/resources/image/'
+        directory = getImageDirector()
         bot.sendMessage (chat_id, str(os.listdir(directory)))
     elif command == '/deleteImages':
         deleteAllImages(bot, chat_id)
@@ -145,16 +171,18 @@ def startLiseningMessages():
         print('[LogId] MessageLoop error')
 
 # Start listening to the telegram bot and whenever a message is  received, the handle function will be called.
-startLiseningMessages()
+try:
+    startLiseningMessages()
+except:
+    print('startLiseningMessages')
 
 while True:
-    pir.wait_for_motion()
-    bot.sendMessage(globalChatId, str('Motion detected'))
-    led.on()
-    
-    recordVideo(bot, globalChatId, 5)
-    
-    led.off()
-        
-#bot = telepot.Bot('')
-#print (bot.getMe())
+    try:
+        pir.wait_for_motion()
+        bot.sendMessage(globalChatId, str('Motion detected'))
+        led.on()
+        recordVideo(bot, globalChatId, 20)
+    except:
+        print('Got error')
+    finally:
+        led.off()
