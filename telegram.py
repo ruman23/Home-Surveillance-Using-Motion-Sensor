@@ -33,6 +33,7 @@ messageQueue = []
 retyring = 14400
 retyringAfter = 2
 
+commandList = '/hi /time /date /file /video /videoList /deleteVideos /image /imageList /deleteImages /commands' 
 
 
 def getImageDirector():
@@ -55,11 +56,6 @@ def connectToBoot():
         print('[LogId] connected to bot')
     except:
         print('[LogId] Could not connect to boot')
-    
-    
-connectToBoot()
-
-commandList = '/hi /time /date /file /video /videoList /deleteVideos /image /imageList /deleteImages /commands' 
 
 def getFileName():
     return datetime.datetime.now().strftime("%Y-%m-%d_%H.%M.%S.%f")
@@ -230,21 +226,27 @@ def startLiseningMessages():
         print ('[LogId] Listening....')
     except:
         print('[LogId] MessageLoop error')
-
-# Start listening to the telegram bot and whenever a message is  received, the handle function will be called.
-try:
-    startLiseningMessages()
-except:
-    print('startLiseningMessages')
-
-while True:
+        
+def main():
+    connectToBoot()
+    # Start listening to the telegram bot and whenever a message is  received, the handle function will be called.
     try:
-        pir.wait_for_motion()
-        sendMessage(bot, globalChatId, str('Motion detected'))
-        led.on()
-        print('Recording video...')
-        recordVideo(bot, globalChatId, 30)
+        startLiseningMessages()
     except:
-        print('Got error')
-    finally:
-        led.off()
+        print('startLiseningMessages')
+        
+    while True:
+        try:
+            pir.wait_for_motion()
+            sendMessage(bot, globalChatId, str('Motion detected'))
+            led.on()
+            print('Recording video...')
+            recordVideo(bot, globalChatId, 30)
+        except:
+            print('Got error')
+        finally:
+            led.off()
+
+if __name__ == "__main__":
+    main()
+    led.off()
