@@ -12,7 +12,7 @@ from time import sleep  # Importing the time library to provide the delays in pr
 
 camera = picamera.PiCamera()
 camera.resolution = (640, 480)
-camera.framerate = 10
+camera.framerate = 20
 camera.vflip = True
 
 
@@ -23,8 +23,8 @@ pir = MotionSensor(4)
 
 now = datetime.datetime.now()
 
-bot = telepot.Bot('your_bot_id')
-globalChatId = your_chat_id
+bot = telepot.Bot('set_your_bot_id_here')
+globalChatId = set_your_chat_id
 
 videoQueue = []
 photoQueue = []
@@ -50,12 +50,12 @@ def getVideoDirectory():
     
 
 def connectToBoot():
-    print('[LogId] Connecting to bot...')
+    print('Connecting to bot...')
     try:
         print(bot.getMe())
-        print('[LogId] connected to bot')
+        print('connected to bot')
     except:
-        print('[LogId] Could not connect to boot')
+        print('Could not connect to boot')
 
 def getFileName():
     return datetime.datetime.now().strftime("%Y-%m-%d_%H.%M.%S.%f")
@@ -83,9 +83,13 @@ def sendMessage(bot, chat_id, msg):
 def deleteFiles(bot, chat_id, directory, notDeletedFileCount):
     files = os.listdir(directory)
     totalFiles = len(files)
+    files.sort()
     
     for fileIndex in range(0, totalFiles - notDeletedFileCount):
-        os.remove(os.path.join(directory, files[fileIndex]))
+        try:
+            os.remove(os.path.join(directory, files[fileIndex]))
+        except:
+            print('Could not delete the video' + files[fileIndex])
         
     print('Total deleted videos: '+ str(totalFiles - notDeletedFileCount))
     sendMessage(bot, chat_id, str(totalFiles - notDeletedFileCount) + str(' files has been deleted.'))
@@ -95,6 +99,7 @@ def captureImage(bot, chat_id):
     path = getImageDirector()
     fileName = getFileName()
     fileExtension = '.jpeg'
+    camera.annotate_text = fileName
     imagePath = path + fileName + fileExtension
         
     sendMessage(bot, chat_id, str("Capturing image..."))
@@ -109,25 +114,34 @@ def deleteAllImages(bot, chat_id):
     totalFiles = len(files)
     print('Deleting images')
     for file in files:
-        os.remove(os.path.join(directory, file))
+        try:
+            os.remove(os.path.join(directory, file))
+        except:
+            print('Could not delete the image')
     sendMessage(bot, chat_id, str(totalFiles) + str(' files has been deleted.'))
     print('Total deleted images: '+ str(totalFiles))
     
 def sendTheVideo(bot, chat_id):
     while len(videoQueue):
         videoPath = videoQueue.pop(0)
-        for tryCount in range(0, retyring):
-            try:
-                bot.sendVideo(chat_id, video = open(videoPath, 'rb'))
+        try:
+            video = open(videoPath, 'rb')
+            for tryCount in range(0, retyring):
                 try:
-                    deleteFiles(bot, chat_id, getVideoDirectory(), 5)
+                    bot.sendVideo(chat_id, video = open(videoPath, 'rb'))
+                    try:
+                        deleteVideoThread = Thread(target = deleteFiles, args = (bot, chat_id, getVideoDirectory(), 10))
+                        deleteVideoThread.start()
+                        deleteVideoThread.join()
+                    except:
+                        print('Could not delete the files')
                 except:
-                    print('Could not delete the files')
-            except:
-                print('could not send the video')
-                sleep(retyringAfter)
-                continue
-            break
+                    print('could not send the video' + videoPath)
+                    sleep(retyringAfter)
+                    continue
+                break
+        except:
+            print('Invalid video file')
     
 def sendThePhoto(bot, chat_id):
     while len(photoQueue):
@@ -157,6 +171,7 @@ def recordVideo(bot, chat_id, recordingTime):
     h264Extension = '.h264'
     mp4Extension = '.mp4'
     
+    camera.annotate_text = fileName
     camera.start_recording(path + fileName + h264Extension)
     camera.wait_recording(recordingTime)
     camera.stop_recording()
@@ -171,9 +186,6 @@ def recordVideo(bot, chat_id, recordingTime):
     
     t1 = Thread(target = sendTheVideo, args = (bot, chat_id))
     t1.start()
-    
-    #delete h264 video file
-    os.remove(path+ fileName + h264Extension) 
 
 def deletedAllVideos(bot, chat_id):
     directory = getVideoDirectory()
@@ -181,7 +193,10 @@ def deletedAllVideos(bot, chat_id):
     totalFiles = len(files)
     print('Total deleted videos: '+ str(totalFiles))
     for file in files:
-        os.remove(os.path.join(directory, file))
+        try:
+            os.remove(os.path.join(directory, file))
+        except:
+            print('Could not delete the video')
     sendMessage(bot, chat_id, str(totalFiles) + str(' files has been deleted.'))
 
     
@@ -217,15 +232,15 @@ def handle(msg):
     elif command == '/commands':
         sendMessage(bot, chat_id, commandList)
     else:
-        sendMessage(bot, chat_id, str("Please write a right command. Please type `/commands` for command list"))
+        sendMessage(bot, chat_id, str("Please write a right command. Please send the write commands from the list") + commandList)
 
 
 def startLiseningMessages():
     try:
         MessageLoop(bot, handle).run_as_thread()
-        print ('[LogId] Listening....')
+        print ('Listening....')
     except:
-        print('[LogId] MessageLoop error')
+        print('MessageLoop error')
         
 def main():
     connectToBoot()
@@ -241,7 +256,7 @@ def main():
             sendMessage(bot, globalChatId, str('Motion detected'))
             led.on()
             print('Recording video...')
-            recordVideo(bot, globalChatId, 30)
+            recordVideo(bot, globalChatId, 10)
         except:
             print('Got error')
         finally:
@@ -249,4 +264,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    led.off()
